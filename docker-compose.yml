@@ -1,0 +1,16 @@
+version: "3.7"
+services:
+  database:
+    image: postgres:14-alpine
+    container_name: app_database
+    env_file:
+      - .env
+    restart: always
+    ports:
+      - "5431:5432"
+    networks:
+      - app_fastapi
+networks:
+  app_fastapi:
+    name: app_fastapi_pet
+    driver: bridge
