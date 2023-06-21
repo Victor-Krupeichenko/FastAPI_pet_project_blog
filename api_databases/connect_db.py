@@ -1,8 +1,8 @@
-from api_databases.address_db import URL_DATABASE
+from api_databases.address_db import _URL_DATABASE
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-engine = create_async_engine(URL_DATABASE, future=True)
+engine = create_async_engine(_URL_DATABASE, future=True)
 async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
