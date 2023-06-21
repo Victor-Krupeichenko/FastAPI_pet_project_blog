@@ -6,4 +6,4 @@ from src.settings_env import (
     POSTGRES_DB as postg_db
 )
 
-URL_DATABASE = f'postgresql+asyncpg://{postg_user}:{postg_password}@{postg_host}:{postg_port}/{postg_db}'
+_URL_DATABASE = f'postgresql+asyncpg://{postg_user}:{postg_password}@{postg_host}:{postg_port}/{postg_db}'
