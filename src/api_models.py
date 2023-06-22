@@ -34,7 +34,7 @@ class Post(Base):
     published = Column(Boolean, default=False)
     category_id = Column(Integer, ForeignKey("category.id"))
     user = relationship("User", back_populates="posts")
-    category = relationship("Category", back_populates="post")
+    category = relationship("Category", back_populates="posts")
 
 
 class Category(Base):
