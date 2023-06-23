@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from src.api_models import User
 from user.token_from_cookies import OAuth2PasswordBearerWithCookie
+from api_databases.connect_db import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 ACCESS_TOKEN_EXPIRE_DAYS = 1
 NAME_COOKIES = "my_app_cookies"
@@ -20,7 +22,10 @@ def create_access_token(data: dict):
     return encoded_jwt  # Возвращаем закодированный токен
 
 
-async def get_current_user(request: Request, protect: str = Depends(oauth2_scheme)):
+async def get_current_user(request: Request,
+                           session: AsyncSession = Depends(get_async_session),
+                           protect: str = Depends(oauth2_scheme)
+                           ):
     """Получение текущего пользователя"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -35,7 +40,18 @@ async def get_current_user(request: Request, protect: str = Depends(oauth2_schem
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    current_user = select(User.username).select_from(User).filter(User.username == username)
-    if current_user is None:
+    user = select(User.username, User.group, User.is_active, User.id, User.email).select_from(User).filter(
+        User.username == username)
+    if user is None:
         raise credentials_exception
-    return username  # Возвращаем имя текущего пользователя
+    temporary = await session.execute(user)
+    try:
+        temporary_user = temporary.all()[0]  # Попадаем внутрь списка
+        current_user = dict(zip(["username", "group", "is_active", "user_id", "email"], temporary_user))
+        # Возвращаем словарь с информацией о текущего пользователя
+        return current_user
+    except IndexError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='This user does not exist'
+        )
