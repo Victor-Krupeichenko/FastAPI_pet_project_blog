@@ -3,11 +3,12 @@ from sqlalchemy.exc import IntegrityError
 from fastapi.security import OAuth2PasswordRequestForm
 from user.my_token import create_access_token, NAME_COOKIES
 from src.api_models import User
-from user.schemas import UserSchema
+from user.schemas import UserSchema, AdminUserScheme
 from api_databases.connect_db import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.hash import pbkdf2_sha256
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, update, delete
+from user.my_token import get_current_user
 
 router = APIRouter(
     prefix="/user", tags=["User"]
@@ -64,3 +65,52 @@ async def login(
     # Сохранение токена в cookie
     response.set_cookie(key=NAME_COOKIES, value=f"Bearer {jwt_token}", httponly=True)
     return {"message": f"{user.username} -> login"}
+
+
+@router.patch("/update_user_group/{user_id}", status_code=status.HTTP_202_ACCEPTED)
+async def update_user(
+        user_id: int, user: AdminUserScheme,
+        current_user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_async_session)
+):
+    """Обновление поля group у пользователя"""
+    if current_user["group"] == "ADMIN":
+        try:
+            update_values = user.dict(exclude_unset=True)  # Исключаем поля которые небыли переданы
+            query = update(User).filter(User.id == user_id).values(**update_values)
+            await session.execute(query)
+            await session.commit()
+            return {"message": "group changed successful to ADMIN"}
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data is not valid")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"You {current_user['username']}: are not a superuser"
+    )
+
+
+@router.delete("/delete_user/{user_id}")
+async def delete_user(user_id: int, current_user: dict = Depends(get_current_user),
+                      session: AsyncSession = Depends(get_async_session)
+                      ):
+    """Удаление пользователя"""
+    if current_user["group"] == "ADMIN" or current_user["user_id"] == user_id:
+        try:
+            query = delete(User).filter(User.id == user_id)
+            await session.execute(query)
+            await session.commit()
+            response = {
+                "status": status.HTTP_204_NO_CONTENT,
+                "detail": "User Deleted!"
+            }
+            return response
+        except Exception:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Data is not valid"
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Admin: You are not allowed to delete other users"
+        )
