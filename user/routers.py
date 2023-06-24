@@ -114,3 +114,62 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
             status_code=status.HTTP_409_CONFLICT,
             detail="Admin: You are not allowed to delete other users"
         )
+
+
+@router.put("/update_user/{user_id}")
+async def update_user(user_id: int, user: UserSchema, current_user: dict = Depends(get_current_user),
+                      session: AsyncSession = Depends(get_async_session)
+                      ):
+    """Обновление пользователя"""
+    if current_user["user_id"] == user_id or current_user["group"] == "ADMIN":
+        q_username = select(User.username).filter(User.username == user.username)
+        q_email = select(User.email).filter(User.email == user.email)
+        if user.username != current_user["username"]:
+            exists = await session.execute(q_username)
+            result = exists.scalar()
+            if result is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"The user: {user.username} is already registered."
+                )
+        if user.email != current_user["email"]:
+            exists = await session.execute(q_email)
+            result = exists.scalar()
+            if result is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"User with email: {user.email} is already registered."
+                )
+        hashed_password = pbkdf2_sha256.hash(user.password)
+        try:
+            user_update = update(User).values(
+                username=user.username,
+                password=hashed_password,
+                email=user.email
+            ).filter(User.id == user_id)
+            await session.execute(user_update)
+            await session.commit()
+            response = {
+                "status": status.HTTP_202_ACCEPTED,
+                "data": {**user.dict()},
+                "detail": "success"
+            }
+            return response
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Data is not valid"
+            )
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=f"Username does not match yours"
+    )
+
+
+@router.post("/logout")
+async def user_logout(response: Response, current_user: dict = Depends(get_current_user)):
+    """Выход пользователя из приложения"""
+    username = current_user["username"]
+    response.delete_cookie(NAME_COOKIES)
+    return {"message": f"Пользователь {username} -> вышел из сети"}
