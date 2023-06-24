@@ -1,8 +1,8 @@
-"""2023-06-20-one
+"""2023-06-24
 
-Revision ID: 5c7accc8ade5
+Revision ID: 12b6323ddbde
 Revises: 
-Create Date: 2023-06-20 15:56:39.346642
+Create Date: 2023-06-24 10:49:44.111015
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy_utils
 from src.api_models import User
 
 # revision identifiers, used by Alembic.
-revision = '5c7accc8ade5'
+revision = '12b6323ddbde'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -41,12 +41,12 @@ def upgrade() -> None:
                     sa.Column('id', sa.Integer(), nullable=False),
                     sa.Column('title', sa.String(length=250), nullable=False),
                     sa.Column('content', sa.Text(), nullable=False),
-                    sa.Column('author', sa.String(), nullable=False),
                     sa.Column('created', sa.TIMESTAMP(), nullable=True),
                     sa.Column('published', sa.Boolean(), nullable=True),
-                    sa.Column('category_id', sa.Integer(), nullable=True),
-                    sa.ForeignKeyConstraint(['author'], ['user.username'], ),
+                    sa.Column('user_id', sa.Integer(), nullable=False),
+                    sa.Column('category_id', sa.Integer(), nullable=False),
                     sa.ForeignKeyConstraint(['category_id'], ['category.id'], ),
+                    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
                     sa.PrimaryKeyConstraint('id')
                     )
     # ### end Alembic commands ###
