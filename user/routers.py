@@ -7,7 +7,7 @@ from user.schemas import UserSchema, AdminUserScheme
 from api_databases.connect_db import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.hash import pbkdf2_sha256
-from sqlalchemy import insert, select, update, delete
+from sqlalchemy import insert, select, update
 from user.my_token import get_current_user
 
 router = APIRouter(
@@ -95,8 +95,9 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
     """Удаление пользователя"""
     if current_user["group"] == "ADMIN" or current_user["user_id"] == user_id:
         try:
-            query = delete(User).filter(User.id == user_id)
-            await session.execute(query)
+            query = select(User).filter(User.id == user_id)
+            user_delete = await session.execute(query)
+            await session.delete(user_delete.scalar())
             await session.commit()
             response = {
                 "status": status.HTTP_204_NO_CONTENT,
