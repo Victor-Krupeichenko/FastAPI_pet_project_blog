@@ -29,10 +29,10 @@ class Post(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(250), nullable=False)
     content = Column(Text, nullable=False)
-    author = Column(String, ForeignKey("user.username"), nullable=False)
     created = Column(TIMESTAMP, default=datetime.utcnow)
     published = Column(Boolean, default=False)
-    category_id = Column(Integer, ForeignKey("category.id"))
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("category.id"), nullable=False)
     user = relationship("User", back_populates="posts")
     category = relationship("Category", back_populates="posts")
 
@@ -42,4 +42,4 @@ class Category(Base):
     __tablename__ = "category"
     id = Column(Integer, primary_key=True)
     title = Column(String(40), nullable=False, unique=True, index=True)
-    posts = relationship("Post", back_populates="category")
+    posts = relationship("Post", back_populates="category", cascade="all, delete")
