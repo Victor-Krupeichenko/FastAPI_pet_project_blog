@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from user.my_token import create_access_token, NAME_COOKIES
 from src.api_models import User
 from user.schemas import UserSchema, AdminUserScheme
-from api_databases.connect_db import get_async_session
+from api_databases.connect_db import get_async_session, data_is_not_valid
 from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.hash import pbkdf2_sha256
 from sqlalchemy import insert, select, update
@@ -37,10 +37,7 @@ async def user_create(user: UserSchema, session: AsyncSession = Depends(get_asyn
         )
     except Exception:
         # Все остальные исключения
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data is not valid"
-        )
+        raise data_is_not_valid
 
 
 @router.post("/login")
@@ -81,7 +78,7 @@ async def update_user(
             await session.commit()
             return {"message": "group changed successful to ADMIN"}
         except Exception:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data is not valid")
+            raise data_is_not_valid
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"You {current_user['username']}: are not a superuser"
@@ -106,10 +103,7 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
             return response
         except Exception:
             await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Data is not valid"
-            )
+            raise data_is_not_valid
     else:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -157,10 +151,7 @@ async def update_user(user_id: int, user: UserSchema, current_user: dict = Depen
             }
             return response
         except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Data is not valid"
-            )
+            raise data_is_not_valid
 
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
