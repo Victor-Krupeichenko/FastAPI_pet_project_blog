@@ -9,3 +9,7 @@ class PostScheme(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class AdminPostScheme(BaseModel):
+    published: bool = True
