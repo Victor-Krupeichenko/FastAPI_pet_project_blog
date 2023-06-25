@@ -1,3 +1,4 @@
+from fastapi import HTTPException, status
 from api_databases.address_db import _URL_DATABASE
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -10,3 +11,10 @@ async def get_async_session():
     """Асинхронное получение сессии"""
     async with async_session() as session:
         yield session
+
+
+# исключение, которое возникает при неверном запросе
+data_is_not_valid = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="Data is not valid"
+)
