@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, status, HTTPException
+from sqlalchemy.orm import joinedload, selectinload
 from src.api_models import Post
 from sqlalchemy.ext.asyncio import AsyncSession
-from api_databases.connect_db import get_async_session
-from post.schemes import PostScheme
-from sqlalchemy import insert
+from api_databases.connect_db import get_async_session, data_is_not_valid
+from post.schemes import PostScheme, AdminPostScheme
+from sqlalchemy import insert, select, update
 from user.my_token import get_current_user
 
 router = APIRouter(
@@ -19,24 +20,101 @@ async def create_post(
 ):
     """Создание записи"""
     try:
-        query = insert(Post).values(
-            title=post.title,
-            content=post.content,
-            author=current_user,
-            category_id=post.category_id
-        )
-
+        query = insert(Post).values(**post.dict(), user_id=current_user["user_id"])
         await session.execute(query)
         await session.commit()
+
         response = {
             "status": status.HTTP_201_CREATED,
-            "data": {**post.dict(), "author": current_user},
+            "data": {**post.dict(), "username": current_user["username"]},
             "detail": None
         }
         return response
 
     except Exception:
+        raise data_is_not_valid
+
+
+@router.get("/all_posts", status_code=status.HTTP_200_OK)
+async def get_all_posts(session: AsyncSession = Depends(get_async_session)):
+    """Получение всех записей опубликованных записей"""
+    try:
+        query = select(Post).options(selectinload(Post.category)).filter(Post.published).order_by(Post.id.desc())
+        all_posts = await session.execute(query)
+        result = all_posts.scalars().all()
+        all_post_list = list()
+        for item in result:
+            response = {
+                "title": item.title,
+                "content": item.content,
+                "category": item.category.title
+            }
+            all_post_list.append(response)
+        return all_post_list
+
+    except Exception:
+        raise data_is_not_valid
+
+
+@router.get("/one_post/{post_id}", status_code=status.HTTP_200_OK)
+async def get_one_post(post_id: int, session: AsyncSession = Depends(get_async_session)):
+    """Получение конкретной записи"""
+    query = select(Post).options(joinedload(Post.category)).filter(Post.id == post_id)
+    post = await session.execute(query)
+    result = post.scalar()
+    if result is not None:
+        response = {
+            "title": result.title,
+            "content": result.content,
+            "category": result.category.title
+        }
+        return response
+    raise data_is_not_valid
+
+
+@router.put("/update_post/{post_id}", status_code=status.HTTP_202_ACCEPTED)
+async def update_post(post_id: int, post: PostScheme, current_user: dict = Depends(get_current_user),
+                      session: AsyncSession = Depends(get_async_session)
+                      ):
+    """Обновление конкретной записи"""
+    query = select(Post).filter(Post.id == post_id)
+    exists = await session.execute(query)
+    result = exists.scalar()
+    if result is None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data is not valid"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post ID: {post_id} not found"
         )
+    if current_user["group"] == "ADMIN" or result.user_id == current_user["user_id"]:
+        try:
+            post_update = update(Post).values(**post.dict()).filter(Post.id == post_id)
+            await session.execute(post_update)
+            await session.commit()
+            return {**post.dict()}
+        except Exception:
+            raise data_is_not_valid
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="You are not the author of this post"
+    )
+
+
+@router.patch("/update_post_published/{post_id}", status_code=status.HTTP_202_ACCEPTED)
+async def update_post_published(post_id: int, post: AdminPostScheme, current_user: dict = Depends(get_current_user),
+                                session: AsyncSession = Depends(get_async_session)
+                                ):
+    """Опубликовывает запись (published ставить в True)"""
+    if current_user["group"] == "ADMIN":
+        try:
+            update_published = post.dict(exclude_unset=True)
+            query = update(Post).values(**update_published).filter(Post.id == post_id)
+            print(query)
+            await session.execute(query)
+            await session.commit()
+            return {"message": f"Post ID: {post_id} published"}
+        except Exception:
+            raise data_is_not_valid
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Only an Administrator can change the status of a post"
+    )
