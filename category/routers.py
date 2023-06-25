@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from src.api_models import Category
-from api_databases.connect_db import get_async_session
+from api_databases.connect_db import get_async_session, data_is_not_valid
 from sqlalchemy.ext.asyncio import AsyncSession
 from category.schemes import CategoryScheme, ResponseCategoryScheme
 from sqlalchemy import insert, select, update
@@ -9,11 +9,6 @@ from typing import List
 
 router = APIRouter(
     prefix="/category", tags=["Category"]
-)
-
-raise_except = HTTPException(
-    status_code=status.HTTP_400_BAD_REQUEST,
-    detail="Data is not valid"
 )
 
 
@@ -38,7 +33,7 @@ async def create_category(category: CategoryScheme, session: AsyncSession = Depe
         }
         return response
     except Exception:
-        raise raise_except
+        raise data_is_not_valid
 
 
 @router.put("/update_category/{category_id}")
@@ -71,7 +66,7 @@ async def update_category(category_id: int, category: CategoryScheme,
         }
         return response
     except Exception:
-        raise raise_except
+        raise data_is_not_valid
 
 
 @router.get("/category/{category_id}")
@@ -89,10 +84,7 @@ async def get_category(category_id: int, session: AsyncSession = Depends(get_asy
             "detail": None
         }
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data is not valid"
-        )
+        raise data_is_not_valid
 
 
 @router.get("/categories_all", response_model=List[ResponseCategoryScheme], status_code=status.HTTP_200_OK)
@@ -111,10 +103,7 @@ async def get_all_categories(session: AsyncSession = Depends(get_async_session))
         # }
         return result
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data is not valid"
-        )
+        raise data_is_not_valid
 
 
 @router.delete("/delete_category/{category_id}")
@@ -130,10 +119,7 @@ async def delete_category(category_id: int, current_user: dict = Depends(get_cur
             await session.commit()
             return {"message": f"Category ID: {category_id} DELETED!"}
         except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Data is not valid"
-            )
+            raise data_is_not_valid
 
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
