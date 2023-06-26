@@ -2,14 +2,24 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import joinedload, selectinload
 from src.api_models import Post
 from sqlalchemy.ext.asyncio import AsyncSession
-from api_databases.connect_db import get_async_session, data_is_not_valid
+from api_databases.connect_db import get_async_session, data_is_not_valid, PAGE, LIMIT
 from post.schemes import PostScheme, AdminPostScheme
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, select, update, and_, func
 from user.my_token import get_current_user
 
 router = APIRouter(
     prefix="/post", tags=["Post"]
 )
+
+count_date = None
+
+
+async def get_count_date(session: AsyncSession = Depends(get_async_session)):
+    """Получает общее количество опубликованных данных"""
+    query = select(func.count()).select_from(Post).filter(Post.published)
+    exists = await session.scalar(query)
+    global count_date
+    count_date = exists
 
 
 @router.post("/create_post")
@@ -36,22 +46,28 @@ async def create_post(
 
 
 @router.get("/all_posts", status_code=status.HTTP_200_OK)
-async def get_all_posts(session: AsyncSession = Depends(get_async_session)):
-    """Получение всех записей опубликованных записей"""
+async def get_all_posts(page: int = PAGE, limit: int = LIMIT,
+                        session: AsyncSession = Depends(get_async_session)):
+    """Получение всех опубликованных записей"""
     try:
-        query = select(Post).options(selectinload(Post.category)).filter(Post.published).order_by(Post.id.desc())
-        all_posts = await session.execute(query)
+        # Получаем общее количество данных
+        if count_date is None:
+            await get_count_date(session)
+        # Пагинация
+        start = (page - 1) * limit
+        end = start + limit
+        qu = select(Post).options(selectinload(Post.category)).filter(
+            Post.published
+        ).order_by(Post.id.desc()).slice(start, end)
+        all_posts = await session.execute(qu)
         result = all_posts.scalars().all()
-        all_post_list = list()
-        for item in result:
-            response = {
-                "title": item.title,
-                "content": item.content,
-                "category": item.category.title
-            }
-            all_post_list.append(response)
-        return all_post_list
-
+        response = {
+            "data": result,
+            "count_data": count_date,
+            "start": start,
+            "end": end
+        }
+        return response
     except Exception:
         raise data_is_not_valid
 
@@ -59,16 +75,11 @@ async def get_all_posts(session: AsyncSession = Depends(get_async_session)):
 @router.get("/one_post/{post_id}", status_code=status.HTTP_200_OK)
 async def get_one_post(post_id: int, session: AsyncSession = Depends(get_async_session)):
     """Получение конкретной записи"""
-    query = select(Post).options(joinedload(Post.category)).filter(Post.id == post_id)
+    query = select(Post).options(joinedload(Post.category), joinedload(Post.user)).filter(Post.id == post_id)
     post = await session.execute(query)
     result = post.scalar()
     if result is not None:
-        response = {
-            "title": result.title,
-            "content": result.content,
-            "category": result.category.title
-        }
-        return response
+        return result
     raise data_is_not_valid
 
 
@@ -118,3 +129,12 @@ async def update_post_published(post_id: int, post: AdminPostScheme, current_use
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Only an Administrator can change the status of a post"
     )
+
+
+@router.get("/category_post_all/{category_id}", status_code=status.HTTP_200_OK)
+async def category_post_all(category_id: int, session: AsyncSession = Depends(get_async_session)):
+    """Получение всех записей у конкретной категории"""
+    category = select(Post).filter(and_(Post.category_id == category_id, Post.published))
+    exists = await session.execute(category)
+    result = exists.scalars().all()
+    return result
