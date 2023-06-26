@@ -18,3 +18,6 @@ data_is_not_valid = HTTPException(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="Data is not valid"
 )
+
+PAGE = 1  # Указывает на текущую страницу
+LIMIT = 9  # Указывает количество записей на странице
