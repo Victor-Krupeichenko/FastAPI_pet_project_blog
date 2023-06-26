@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from src.api_models import Category
+from src.api_models import Category, Post
 from api_databases.connect_db import get_async_session, data_is_not_valid
 from sqlalchemy.ext.asyncio import AsyncSession
-from category.schemes import CategoryScheme, ResponseCategoryScheme
-from sqlalchemy import insert, select, update
+from category.schemes import CategoryScheme
+from sqlalchemy import insert, select, update, func
 from user.my_token import get_current_user
-from typing import List
 
 router = APIRouter(
     prefix="/category", tags=["Category"]
@@ -78,30 +77,24 @@ async def get_category(category_id: int, session: AsyncSession = Depends(get_asy
         result = my_category.scalar()
         if result is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Category ID: {category_id} not found')
-        return {
-            "status": status.HTTP_200_OK,
-            "data": result,
-            "detail": None
-        }
+        return result
     except Exception:
         raise data_is_not_valid
 
 
-@router.get("/categories_all", response_model=List[ResponseCategoryScheme], status_code=status.HTTP_200_OK)
+@router.get("/categories_all", status_code=status.HTTP_200_OK)
 async def get_all_categories(session: AsyncSession = Depends(get_async_session)):
-    """Получение всех категорий"""
+    """Получение только тех категорий, у которых есть опубликованные посты"""
     try:
-        category = select(Category)
-        categories_all = await session.execute(category)
-        result = categories_all.scalars().all()
+        category = select(Category.id, Category.title, func.count(Post.id)).join(Category.posts).filter(
+            Post.published).group_by(Category.id, Category.title)
+        exists = await session.execute(category)
+        result = exists.fetchall()
         if result is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Categories not found')
-        # return {
-        #     "status": status.HTTP_200_OK,
-        #     "data": result.all(),
-        #     "detail": None
-        # }
+        result = [{"category_id": row[0], "category": row[1], "post_count": row[2]} for row in result]
         return result
+
     except Exception:
         raise data_is_not_valid
 
