@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends
 from fastapi.templating import Jinja2Templates
-from api_databases.connect_db import PAGE, LIMIT
+from api_databases.connect_db import PAGE
 from post.routers import (
     get_all_posts,
     get_one_post,
@@ -34,13 +34,12 @@ env.filters["word_count"] = word_count
 
 @router.get("/")
 async def post_all(request: Request, posts=Depends(get_all_posts), categories=Depends(get_all_categories),
-                   page: int = PAGE,
-                   limit: int = LIMIT):
+                   page: int = PAGE):
     """Главная страница (вывод всех постов)"""
     return templates.TemplateResponse("index.html",
-                                      {"request": request, "posts": posts["data"], "count_data": posts["count_data"],
+                                      {"request": request, "posts": posts["data"], "total_pages": posts["total_pages"],
                                        "categories": categories, "page": page,
-                                       "limit": limit, "start": posts["start"], "end": posts["end"]})
+                                       "show_pagination": posts["show_pagination"]})
 
 
 @router.get("/one_post/{post_id}")
@@ -52,8 +51,10 @@ def one_post(request: Request, post=Depends(get_one_post), categories=Depends(ge
 
 @router.get('/category_post_all/{category_id}')
 def category_post_all(request: Request, posts=Depends(category_post_all), categories=Depends(get_all_categories),
-                      category_title=Depends(get_category)):
+                      category_title=Depends(get_category), page: int = PAGE):
     """Вывод всех записей у конкретной категории"""
     return templates.TemplateResponse("index.html",
-                                      {"request": request, "posts": posts, "categories": categories,
+                                      {"request": request, "posts": posts["data"], "total_pages": posts["total_pages"],
+                                       "categories": categories, "page": page,
+                                       "show_pagination": posts["show_pagination"],
                                        "category_title": category_title})
