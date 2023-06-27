@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, responses, status
 from fastapi.templating import Jinja2Templates
 from api_databases.connect_db import PAGE
 from post.routers import (
@@ -9,6 +9,9 @@ from post.routers import (
 from category.routers import (
     get_all_categories,
     get_category
+)
+from user.routers import (
+    user_create
 )
 
 router = APIRouter(include_in_schema=False)
@@ -34,12 +37,12 @@ env.filters["word_count"] = word_count
 
 @router.get("/")
 async def post_all(request: Request, posts=Depends(get_all_posts), categories=Depends(get_all_categories),
-                   page: int = PAGE):
-    """Главная страница (вывод всех постов)"""
+                   page: int = PAGE, messages: str = None):
+    """Главная страница (вывод всех постов) + пагинация """
     return templates.TemplateResponse("index.html",
                                       {"request": request, "posts": posts["data"], "total_pages": posts["total_pages"],
                                        "categories": categories, "page": page,
-                                       "show_pagination": posts["show_pagination"]})
+                                       "show_pagination": posts["show_pagination"], "messages": messages})
 
 
 @router.get("/one_post/{post_id}")
@@ -52,9 +55,26 @@ def one_post(request: Request, post=Depends(get_one_post), categories=Depends(ge
 @router.get('/category_post_all/{category_id}')
 def category_post_all(request: Request, posts=Depends(category_post_all), categories=Depends(get_all_categories),
                       category_title=Depends(get_category), page: int = PAGE):
-    """Вывод всех записей у конкретной категории"""
+    """Вывод всех записей у конкретной категории + пагинация"""
     return templates.TemplateResponse("index.html",
                                       {"request": request, "posts": posts["data"], "total_pages": posts["total_pages"],
                                        "categories": categories, "page": page,
                                        "show_pagination": posts["show_pagination"],
                                        "category_title": category_title})
+
+
+message = "User Register"
+
+
+@router.get("/registration")
+def registration(request: Request):
+    return templates.TemplateResponse("user_create.html", {"request": request, "msg": message})
+
+
+@router.post('/registration')
+def registration(request: Request, user=Depends(user_create)):
+    """Регистрация пользователя"""
+    if "errors" in user:
+        return templates.TemplateResponse("user_create.html",
+                                          {"request": request, "msg": message, "errors": user["errors"]})
+    return responses.RedirectResponse('/?messages=Successfully Registration', status_code=status.HTTP_302_FOUND)
