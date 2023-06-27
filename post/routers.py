@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status, HTTPException
+from math import ceil
 from sqlalchemy.orm import joinedload, selectinload
 from src.api_models import Post
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,12 +15,38 @@ router = APIRouter(
 count_date = None
 
 
-async def get_count_date(session: AsyncSession = Depends(get_async_session)):
+async def get_count_date_all(session: AsyncSession = Depends(get_async_session)):
     """Получает общее количество опубликованных данных"""
     query = select(func.count()).select_from(Post).filter(Post.published)
     exists = await session.scalar(query)
     global count_date
     count_date = exists
+
+
+async def pagination(
+        query, limit, count_data, session: AsyncSession = Depends(get_async_session)
+):
+    """Пагинация"""
+    # Получение количества страниц (округление в большую сторону)
+    total_pages = ceil(count_data / limit)
+    # Определяет показывать пагинацию или нет (Своего рода такой флаг True или False)
+    show_pagination = total_pages > 1
+    # Выполняет запрос на получения записей
+    all_posts = await session.execute(query)
+    result = all_posts.scalars().all()
+    response = {
+        "data": result,
+        "total_pages": total_pages,
+        "show_pagination": show_pagination
+    }
+    return response
+
+
+async def my_range(page, limit):
+    """Диапазон для получения данных для пагинации"""
+    start = (page - 1) * limit
+    end = start + limit
+    return start, end
 
 
 @router.post("/create_post")
@@ -52,22 +79,15 @@ async def get_all_posts(page: int = PAGE, limit: int = LIMIT,
     try:
         # Получаем общее количество данных
         if count_date is None:
-            await get_count_date(session)
-        # Пагинация
-        start = (page - 1) * limit
-        end = start + limit
+            await get_count_date_all(session)
+        # Получение записей в диапазоне
+        start, end = await my_range(page, limit)
         qu = select(Post).options(selectinload(Post.category)).filter(
             Post.published
         ).order_by(Post.id.desc()).slice(start, end)
-        all_posts = await session.execute(qu)
-        result = all_posts.scalars().all()
-        response = {
-            "data": result,
-            "count_data": count_date,
-            "start": start,
-            "end": end
-        }
-        return response
+        # Пагинация
+        result = await pagination(query=qu, count_data=count_date, limit=limit, session=session)
+        return result
     except Exception:
         raise data_is_not_valid
 
@@ -132,9 +152,20 @@ async def update_post_published(post_id: int, post: AdminPostScheme, current_use
 
 
 @router.get("/category_post_all/{category_id}", status_code=status.HTTP_200_OK)
-async def category_post_all(category_id: int, session: AsyncSession = Depends(get_async_session)):
+async def category_post_all(category_id: int, page: int = PAGE, limit: int = LIMIT,
+                            session: AsyncSession = Depends(get_async_session)):
     """Получение всех записей у конкретной категории"""
-    category = select(Post).filter(and_(Post.category_id == category_id, Post.published))
-    exists = await session.execute(category)
-    result = exists.scalars().all()
-    return result
+    try:
+        # Получение количества записей у категории
+        post_count = select(func.count(Post.id)).select_from(Post).filter(
+            and_(Post.category_id == category_id, Post.published))
+        exists = await session.scalar(post_count)
+        # Получение записей в диапазоне
+        start, end = await my_range(page, limit)
+        posts_for_category = select(Post).options(selectinload(Post.category)).filter(
+            and_(Post.category_id == category_id, Post.published)).order_by(Post.id.desc()).slice(start, end)
+        # Пагинация
+        result = await pagination(query=posts_for_category, count_data=exists, limit=limit, session=session)
+        return result
+    except Exception:
+        raise data_is_not_valid
