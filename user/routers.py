@@ -16,28 +16,57 @@ router = APIRouter(
 
 
 @router.post("/user_create")
-async def user_create(user: UserSchema, session: AsyncSession = Depends(get_async_session)):
-    """Создание Пользователя"""
+async def user_create(user: UserSchema = Depends(UserSchema.as_form),
+                      session: AsyncSession = Depends(get_async_session)
+                      ):
+    """Создание пользователя"""
+    errors_list = list()
+    user_data = user.dict()
+    msg = 'A user with the same name or email already exists'
     try:
-        hashed_password = pbkdf2_sha256.hash(user.password)
-        query = insert(User).values(username=user.username, password=hashed_password, email=user.email)
-        await session.execute(query)
-        await session.commit()
-        response = {
-            "status": status.HTTP_201_CREATED,
-            "data": {**user.dict()},
-            "detail": "success"
-        }
-        return response
-    except IntegrityError:
-        # Если username или email неуникальны (Пользователь с таким именем или email уже есть в базе данных)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with the same name or email already exists"
+        # Проверка наличия ошибок валидации полей
+        if isinstance(user_data["username"], dict):
+            errors_list.append(user_data["username"]["message"])
+        if isinstance(user_data["password"], dict):
+            errors_list.append(user_data["password"]["message"])
+        if isinstance(user_data["email"], dict):
+            errors_list.append(user_data["email"]["message"])
+        if errors_list:
+            return {"errors": errors_list}
+
+        # Проверка наличия пользователя в базе данных с таким именем
+        query = select(User).filter(User.username == user_data["username"].title())
+        result = await session.execute(query)
+        user = result.scalar()
+        if user:
+            errors_list.append(msg)
+            return {"errors": errors_list}
+
+        # Добавление (регистрация) пользователя в базу данных
+        hashed_password = pbkdf2_sha256.hash(user_data["password"])
+        new_user = insert(User).values(
+            username=user_data["username"].title(),
+            password=hashed_password,
+            email=user_data["email"]
         )
+        await session.execute(new_user)
+        await session.commit()
+    # Если email неуникальны (Пользователь с таким email уже есть в базе данных)
+    except IntegrityError:
+        errors_list.append(msg)
+        return {"errors": errors_list}
+    # Перехватываем все непредвиденные исключения
     except Exception:
-        # Все остальные исключения
         raise data_is_not_valid
+
+    # При успешной регистрации возвращаем словарь
+    response = {
+        "status": status.HTTP_201_CREATED,
+        "username": user_data["username"].title(),
+        "password": user_data["password"],
+        "email": user_data["email"]
+    }
+    return response
 
 
 @router.post("/login")
