@@ -19,8 +19,9 @@ async def field_validation(field: dict) -> list:
     errors_list = list()
     for key in field.keys():
         if isinstance(field[key], dict):
-            for value in field[key].values():
-                errors_list.append(value)
+            for idx, value in enumerate(field[key].keys()):
+                if idx % 2 == 0:
+                    errors_list.append(field[key][value])
     return errors_list
 
 
