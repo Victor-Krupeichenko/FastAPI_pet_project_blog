@@ -118,3 +118,12 @@ async def delete_category(category_id: int, current_user: dict = Depends(get_cur
         status_code=status.HTTP_409_CONFLICT,
         detail=f"Only administrator can delete categories"
     )
+
+
+@router.get("/categories")
+async def categories(session: AsyncSession = Depends(get_async_session)):
+    """Получение всех категорий"""
+    all_categories = select(Category)
+    exists = await session.execute(all_categories)
+    result = exists.scalars().all()
+    return result
