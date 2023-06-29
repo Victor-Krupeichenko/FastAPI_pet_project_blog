@@ -154,11 +154,15 @@ async def delete_user(user_id: int, current_user: dict = Depends(get_current_use
 
 
 @router.put("/update_user/{user_id}")
-async def update_user(user_id: int, user: UserSchema = Depends(UserSchema.as_form),
+async def update_user(user_id: int, response: Response, user: UserSchema = Depends(UserSchema.as_form),
                       current_user: dict = Depends(get_current_user),
                       session: AsyncSession = Depends(get_async_session)
                       ):
     """Обновление пользователя"""
+    user_data = user.dict()
+    errors_list = await field_validation(user_data)
+    if errors_list:
+        return {"errors": errors_list}
     if current_user["user_id"] == user_id or current_user["group"] == "ADMIN":
         q_username = select(User.username).filter(User.username == user.username)
         q_email = select(User.email).filter(User.email == user.email)
@@ -166,18 +170,16 @@ async def update_user(user_id: int, user: UserSchema = Depends(UserSchema.as_for
             exists = await session.execute(q_username)
             result = exists.scalar()
             if result is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"The user: {user.username} is already registered."
-                )
+                msg = f"The user: {user.username} is already registered."
+                errors_list.append(msg)
+                return {"errors": errors_list}
         if user.email != current_user["email"]:
             exists = await session.execute(q_email)
             result = exists.scalar()
             if result is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"User with email: {user.email} is already registered."
-                )
+                msg = f"User with email: {user.email} is already registered."
+                errors_list.append(msg)
+                return {"errors": errors_list}
         hashed_password = pbkdf2_sha256.hash(user.password)
         try:
             user_update = update(User).values(
@@ -187,12 +189,14 @@ async def update_user(user_id: int, user: UserSchema = Depends(UserSchema.as_for
             ).filter(User.id == user_id)
             await session.execute(user_update)
             await session.commit()
-            response = {
-                "status": status.HTTP_202_ACCEPTED,
-                "data": {**user.dict()},
-                "detail": "success"
+            # Создание токена
+            jwt_token = create_access_token(data={"sub": user.username})
+            # Сохранение токена в cookie
+            response.set_cookie(key=NAME_COOKIES, value=f"Bearer {jwt_token}", httponly=True)
+            return {
+                "token": jwt_token,
+                "username": user.username,
             }
-            return response
         except Exception:
             raise data_is_not_valid
 
