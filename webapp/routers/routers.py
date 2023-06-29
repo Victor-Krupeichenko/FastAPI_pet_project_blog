@@ -136,7 +136,14 @@ def user_update(request: Request, current_user=Depends(get_current_user)):
     })
 
 
-# Обновление пользователя (пока в разработке)
 @router.post('/update_user/{user_id}')
-def user_update(request: Request, user=Depends(update_user)):
-    return responses.RedirectResponse('/?messages=Successfully Registration', status_code=status.HTTP_302_FOUND)
+def user_update(request: Request, user: dict = Depends(update_user), current_user=Depends(get_current_user)):
+    """Обновление пользователя"""
+    if "errors" in user:
+        return templates.TemplateResponse("user_auth.html", {
+            "request": request, "errors": user["errors"], "update_user": True, "current_user": current_user
+        })
+    response = responses.RedirectResponse(f'/?messages=Updated user to: {user["username"]}',
+                                          status_code=status.HTTP_302_FOUND)
+    response.set_cookie(key=NAME_COOKIES, value=f'Bearer {user["token"]}', httponly=True)
+    return response
