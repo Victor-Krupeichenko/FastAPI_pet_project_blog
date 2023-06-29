@@ -7,6 +7,7 @@ from api_databases.connect_db import get_async_session, data_is_not_valid, PAGE,
 from post.schemes import PostScheme, AdminPostScheme
 from sqlalchemy import insert, select, update, and_, func
 from user.my_token import get_current_user
+from user.routers import field_validation
 
 router = APIRouter(
     prefix="/post", tags=["Post"]
@@ -49,27 +50,48 @@ async def my_range(page, limit):
     return start, end
 
 
+async def content_error(row_dict: dict, key: str):
+    """Получает данные если они были введены некорректно"""
+    content_error_dict = {}
+    for dict_key in row_dict:
+        if isinstance(row_dict[dict_key], dict):
+            content_error_dict[dict_key] = row_dict[dict_key][key]
+    return content_error_dict
+
+
 @router.post("/create_post")
 async def create_post(
-        post: PostScheme,
+        post: PostScheme = Depends(PostScheme.is_form),
         session: AsyncSession = Depends(get_async_session),
         current_user: dict = Depends(get_current_user)
 ):
     """Создание записи"""
+    if not current_user:
+        return {"errors": "Not authorized"}
+    post_data = post.dict()
+    print(post_data)
+    errors_list = await field_validation(post_data)
+    if errors_list:
+        data_is_not_correct = await content_error(post_data, "value")
+        response = {
+            "errors": errors_list,
+            "not_correct": data_is_not_correct,
+            "post_data": post_data
+        }
+        return response
     try:
         query = insert(Post).values(**post.dict(), user_id=current_user["user_id"])
         await session.execute(query)
         await session.commit()
-
-        response = {
-            "status": status.HTTP_201_CREATED,
-            "data": {**post.dict(), "username": current_user["username"]},
-            "detail": None
-        }
-        return response
-
     except Exception:
         raise data_is_not_valid
+
+    response = {
+        "status": status.HTTP_201_CREATED,
+        "data": {**post.dict()},
+        "detail": None
+    }
+    return response
 
 
 @router.get("/all_posts", status_code=status.HTTP_200_OK)
