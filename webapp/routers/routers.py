@@ -5,11 +5,13 @@ from user.my_token import get_current_user
 from post.routers import (
     get_all_posts,
     get_one_post,
-    category_post_all
+    category_post_all,
+    create_post
 )
 from category.routers import (
     get_all_categories,
-    get_category
+    get_category,
+    categories
 )
 from user.routers import (
     user_create,
@@ -147,3 +149,33 @@ def user_update(request: Request, user: dict = Depends(update_user), current_use
                                           status_code=status.HTTP_302_FOUND)
     response.set_cookie(key=NAME_COOKIES, value=f'Bearer {user["token"]}', httponly=True)
     return response
+
+
+@router.get("/create_post")
+def create_posts(
+        request: Request, all_categories=Depends(get_all_categories), current_user=Depends(get_current_user),
+        category=Depends(categories)
+):
+    """Создание записи"""
+    create = "Create Post"
+    return templates.TemplateResponse("create_post.html", {
+        "request": request, "categories": all_categories, "current_user": current_user, "msg": create,
+        "category": category,
+    })
+
+
+@router.post("/create_post")
+def create_posts(
+        request: Request, all_categories=Depends(get_all_categories), current_user=Depends(get_current_user),
+        category=Depends(categories), post: dict = Depends(create_post)
+):
+    """Создание записи"""
+    create = "Create Post"
+    if "errors" in post:
+        return templates.TemplateResponse("create_post.html", {
+            "request": request, "categories": all_categories, "current_user": current_user, "msg": create,
+            "category": category, "errors": post["errors"], "not_correct": post["not_correct"], "err": True,
+            "post_data": post["post_data"],
+        })
+    return responses.RedirectResponse(f'/?messages=Post {post["data"]["title"]} Created',
+                                      status_code=status.HTTP_302_FOUND)
