@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from category.schemes import CategoryScheme
 from sqlalchemy import insert, select, update, func
 from user.my_token import get_current_user
+from post.routers import content_error, field_validation
 
 router = APIRouter(
     prefix="/category", tags=["Category"]
@@ -12,27 +13,35 @@ router = APIRouter(
 
 
 @router.post("/create_category")
-async def create_category(category: CategoryScheme, session: AsyncSession = Depends(get_async_session),
+async def create_category(category: CategoryScheme = Depends(CategoryScheme.as_form),
+                          session: AsyncSession = Depends(get_async_session),
                           current_user: dict = Depends(get_current_user)
                           ):
     """Создание категории"""
     if current_user["group"] != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Only administrator can add categories"
-        )
+        return {"errors": "Only administrator can add categories"}
+    category_data = category.dict()
+    errors_list = await field_validation(category_data)
+    if errors_list:
+        data_is_not_correct = await content_error(category_data, "value")
+        response = {
+            "errors": errors_list,
+            "not_correct": data_is_not_correct,
+            "category_data": category_data
+        }
+        return response
     try:
         query = insert(Category).values(title=category.title)
         await session.execute(query)
         await session.commit()
-        response = {
-            "status": status.HTTP_201_CREATED,
-            "data": {**category.dict()},
-            "detail": "success"
-        }
-        return response
-    except Exception:
-        raise data_is_not_valid
+    except Exception as ex:
+        print(ex)
+    response = {
+        "status": status.HTTP_201_CREATED,
+        "data": {**category.dict()},
+        "detail": "success"
+    }
+    return response
 
 
 @router.put("/update_category/{category_id}")
