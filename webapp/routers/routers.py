@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request, Depends, status, responses
 from fastapi.templating import Jinja2Templates
-from starlette.responses import HTMLResponse
 
 from api_databases.connect_db import PAGE
 from user.my_token import get_current_user
@@ -15,7 +14,8 @@ from post.routers import (
 from category.routers import (
     get_all_categories,
     get_category,
-    categories
+    categories,
+    create_category
 )
 from user.routers import (
     user_create,
@@ -219,3 +219,28 @@ def update_post_html(
 def delete_post():
     """Удаление записи"""
     return responses.RedirectResponse('/?messages=Post Delete', status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/category_create")
+def category_create(request: Request, current_user=Depends(get_current_user),
+                    all_categories=Depends(get_all_categories)
+                    ):
+    """Рендеринг формы для добавления категории"""
+    return templates.TemplateResponse("create_category.html", {
+        "request": request, "categories": all_categories, "current_user": current_user
+    })
+
+
+@router.post("/category_create")
+def category_create(request: Request, current_user=Depends(get_current_user),
+                    all_categories=Depends(get_all_categories), category=Depends(create_category)
+                    ):
+    """Добавление категории"""
+    create = "Create Category"
+    if "errors" in category:
+        return templates.TemplateResponse("create_category.html", {
+            "request": request, "err": True, "errors": category["errors"], "not_correct": category["not_correct"],
+            "categories": all_categories, "current_user": current_user, "msg": create
+        })
+    return responses.RedirectResponse(f'/?messages=Category {category["data"]["title"]} create:)',
+                                      status_code=status.HTTP_302_FOUND)
