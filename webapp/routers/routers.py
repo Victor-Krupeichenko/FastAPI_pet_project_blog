@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Request, Depends, status, responses
 from fastapi.templating import Jinja2Templates
+from starlette.responses import HTMLResponse
+
 from api_databases.connect_db import PAGE
 from user.my_token import get_current_user
 from post.routers import (
     get_all_posts,
     get_one_post,
     category_post_all,
-    create_post
+    create_post,
+    update_post,
+    delete_post
 )
 from category.routers import (
     get_all_categories,
@@ -132,6 +136,7 @@ def user_delete():
 
 @router.get("/update_user")
 def user_update(request: Request, current_user=Depends(get_current_user)):
+    """Получение пользователя для обновления"""
     up_user = "Update User"
     return templates.TemplateResponse("user_auth.html", {
         "request": request, "msg": up_user, "update_user": True, "current_user": current_user
@@ -179,3 +184,38 @@ def create_posts(
         })
     return responses.RedirectResponse(f'/?messages=Post {post["data"]["title"]} Created',
                                       status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/edit_post/{post_id}")
+def edit_post(request: Request, current_user=Depends(get_current_user), post=Depends(get_one_post),
+              category=Depends(categories), all_categories=Depends(get_all_categories)
+              ):
+    """Получение записи для обновления"""
+    update = "Update Post"
+    return templates.TemplateResponse("update_post.html", {
+        "request": request, "post": post, "current_user": current_user, "category": category, "msg": update,
+        "categories": all_categories
+    })
+
+
+@router.post("/update_post/{post_id}")
+def update_post_html(
+        request: Request, all_categories=Depends(get_all_categories), current_user=Depends(get_current_user),
+        category=Depends(categories), post=Depends(get_one_post), get_update=Depends(update_post)
+):
+    """Обновление записи"""
+    update = "Update Post"
+    if "errors" in get_update:
+        return templates.TemplateResponse("update_post.html", {
+            "request": request, "post": post, "current_user": current_user, "category": category, "msg": update,
+            "categories": all_categories, "errors": get_update["errors"], "err": True,
+            "not_correct": get_update["not_correct"],
+        })
+    return responses.RedirectResponse(f'/?messages=Post {get_update["title"]} Update',
+                                      status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/delete_post/{post_id}", dependencies=[Depends(delete_post)])
+def delete_post():
+    """Удаление записи"""
+    return responses.RedirectResponse('/?messages=Post Delete', status_code=status.HTTP_302_FOUND)
