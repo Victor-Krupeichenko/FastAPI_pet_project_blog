@@ -69,7 +69,6 @@ async def create_post(
     if not current_user:
         return {"errors": "Not authorized"}
     post_data = post.dict()
-    print(post_data)
     errors_list = await field_validation(post_data)
     if errors_list:
         data_is_not_correct = await content_error(post_data, "value")
@@ -126,7 +125,8 @@ async def get_one_post(post_id: int, session: AsyncSession = Depends(get_async_s
 
 
 @router.put("/update_post/{post_id}", status_code=status.HTTP_202_ACCEPTED)
-async def update_post(post_id: int, post: PostScheme, current_user: dict = Depends(get_current_user),
+async def update_post(post_id: int, post: PostScheme = Depends(PostScheme.is_form),
+                      current_user: dict = Depends(get_current_user),
                       session: AsyncSession = Depends(get_async_session)
                       ):
     """Обновление конкретной записи"""
@@ -134,22 +134,29 @@ async def update_post(post_id: int, post: PostScheme, current_user: dict = Depen
     exists = await session.execute(query)
     result = exists.scalar()
     if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Post ID: {post_id} not found"
-        )
+        return {"errors": f"Post ID: {post_id} not found"}
+    post_data = post.dict()
+    errors_list = await field_validation(post_data)
+    if errors_list:
+        data_is_not_correct = await content_error(post_data, "value")
+        response = {
+            "errors": errors_list,
+            "not_correct": data_is_not_correct,
+            "post_data": post_data
+        }
+        return response
     if current_user["group"] == "ADMIN" or result.user_id == current_user["user_id"]:
         try:
             post_update = update(Post).values(**post.dict()).filter(Post.id == post_id)
             await session.execute(post_update)
             await session.commit()
-            return {**post.dict()}
         except Exception:
             raise data_is_not_valid
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="You are not the author of this post"
-    )
+    else:
+        msg = {"errors": "You are not the author of this post"}
+        errors_list.append(msg)
+        return errors_list
+    return {**post.dict()}
 
 
 @router.patch("/update_post_published/{post_id}", status_code=status.HTTP_202_ACCEPTED)
@@ -191,3 +198,22 @@ async def category_post_all(category_id: int, page: int = PAGE, limit: int = LIM
         return result
     except Exception:
         raise data_is_not_valid
+
+
+@router.delete("/delete_post/{post_id}")
+async def delete_post(post_id: int, session: AsyncSession = Depends(get_async_session),
+                      current_user: dict = Depends(get_current_user)
+                      ):
+    """Удаление записи"""
+    query = select(Post).filter(Post.id == post_id)
+    post = await session.execute(query)
+    post_delete = post.scalar()
+    if not current_user:
+        return {"message": "No authorization"}
+    if not post:
+        return {"message": f"Post ID: {post_id} not found"}
+    if current_user["group"] != "ADMIN" and post_delete.user_id != current_user["user_id"]:
+        return {"message": "You are not the post author or administrator"}
+    await session.delete(post_delete)
+    await session.commit()
+    return {"message": f"Post ID: {post_id} Delete"}
