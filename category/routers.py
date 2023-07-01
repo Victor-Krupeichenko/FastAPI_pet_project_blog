@@ -35,7 +35,7 @@ async def create_category(category: CategoryScheme = Depends(CategoryScheme.as_f
         await session.execute(query)
         await session.commit()
     except Exception as ex:
-        print(ex)
+        return {"errors": f'{ex}'}
     response = {
         "status": status.HTTP_201_CREATED,
         "data": {**category.dict()},
@@ -45,36 +45,44 @@ async def create_category(category: CategoryScheme = Depends(CategoryScheme.as_f
 
 
 @router.put("/update_category/{category_id}")
-async def update_category(category_id: int, category: CategoryScheme,
-                          session: AsyncSession = Depends(get_async_session),
-                          current_user: dict = Depends(get_current_user)
-                          ):
+async def update_one_category(category_id: int, category: CategoryScheme = Depends(CategoryScheme.as_form),
+                              session: AsyncSession = Depends(get_async_session),
+                              current_user: dict = Depends(get_current_user)
+                              ):
     """Обновление категории"""
     if current_user["group"] != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Only administrator can update categories"
-        )
+        return {"errors": "Only administrator can update categories"}
+    category_data = category.dict()
+    errors_list = await field_validation(category_data)
+    if errors_list:
+        data_is_not_correct = await content_error(category_data, "value")
+        response = {
+            "errors": errors_list,
+            "not_correct": data_is_not_correct,
+            "category_data": category_data,
+        }
+        return response
     q_category = select(Category.title).filter(Category.title == category.title)
     exists = await session.execute(q_category)
     result = exists.scalar()
     if result is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"the category with the name: {category.title} already exists"
-        )
+        response = {
+            "errors_title": f"The category with the name: {category.title} already exists",
+            "title": category_data["title"]
+        }
+        return response
     try:
         category_update = update(Category).values(title=category.title).filter(Category.id == category_id)
         await session.execute(category_update)
         await session.commit()
-        response = {
-            "status": status.HTTP_202_ACCEPTED,
-            "data": {**category.dict()},
-            "detail": "success"
-        }
-        return response
-    except Exception:
-        raise data_is_not_valid
+    except Exception as ex:
+        return {"errors": f'{ex}'}
+    response = {
+        "status": status.HTTP_202_ACCEPTED,
+        "data": {**category.dict()},
+        "detail": "success"
+    }
+    return response
 
 
 @router.get("/category/{category_id}")
@@ -113,20 +121,26 @@ async def delete_category(category_id: int, current_user: dict = Depends(get_cur
                           session: AsyncSession = Depends(get_async_session)
                           ):
     """Удаление категории"""
-    if current_user["group"] == "ADMIN":
-        try:
-            query = select(Category).filter(Category.id == category_id)
-            category_delete = await session.execute(query)
-            await session.delete(category_delete.scalar())
-            await session.commit()
-            return {"message": f"Category ID: {category_id} DELETED!"}
-        except Exception:
-            raise data_is_not_valid
+    if not current_user:
+        return {"message": "No authorization"}
+    if current_user["group"] != "ADMIN":
+        return {"messages": "Only administrator can delete categories"}
+    try:
+        query = select(Category).filter(Category.id == category_id)
+        category_delete = await session.execute(query)
+        category = category_delete.scalar()
+        cat_title = category.title
+        if not category:
+            return {"messages": f"Category ID: {category_id} not found"}
+        await session.delete(category)
+        await session.commit()
+        return {
+            "messages": f"Category ID: {category_id} DELETED!",
+            "title": cat_title
+        }
 
-    raise HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail=f"Only administrator can delete categories"
-    )
+    except Exception as ex:
+        return {"messages": ex}
 
 
 @router.get("/categories")
