@@ -9,13 +9,16 @@ from post.routers import (
     category_post_all,
     create_post,
     update_post,
-    delete_post
+    delete_post,
+    search_post
 )
 from category.routers import (
     get_all_categories,
     get_category,
     categories,
-    create_category
+    create_category,
+    update_one_category,
+    delete_category
 )
 from user.routers import (
     user_create,
@@ -48,30 +51,31 @@ env.filters["word_count"] = word_count
 
 
 @router.get("/")
-async def post_all(request: Request, posts=Depends(get_all_posts), categories=Depends(get_all_categories),
+async def post_all(request: Request, posts=Depends(get_all_posts), all_categories=Depends(get_all_categories),
                    page: int = PAGE, messages: str = None, current_user=Depends(get_current_user)):
     """Главная страница (вывод всех постов) + пагинация """
     return templates.TemplateResponse("index.html", {
-        "request": request, "posts": posts, "categories": categories, "page": page, "messages": messages,
+        "request": request, "posts": posts, "categories": all_categories, "page": page, "messages": messages,
         "current_user": current_user
     })
 
 
 @router.get("/one_post/{post_id}")
-def one_post(request: Request, post=Depends(get_one_post), categories=Depends(get_all_categories),
+def one_post(request: Request, post=Depends(get_one_post), all_categories=Depends(get_all_categories),
              current_user=Depends(get_current_user)):
     """Страница детальной информации о записи"""
     return templates.TemplateResponse("detail_post.html", {
-        "request": request, "post": post, "categories": categories, "current_user": current_user
+        "request": request, "post": post, "categories": all_categories, "current_user": current_user
     })
 
 
 @router.get('/category_post_all/{category_id}')
-def category_post_all(request: Request, posts=Depends(category_post_all), categories=Depends(get_all_categories),
+def category_post_all(request: Request, posts=Depends(category_post_all), all_categories=Depends(get_all_categories),
                       category_title=Depends(get_category), page: int = PAGE, current_user=Depends(get_current_user)):
     """Вывод всех записей у конкретной категории + пагинация"""
     return templates.TemplateResponse("index.html", {
-        "request": request, "posts": posts, "categories": categories, "page": page, "category_title": category_title,
+        "request": request, "posts": posts, "categories": all_categories, "page": page,
+        "category_title": category_title,
         "current_user": current_user
     })
 
@@ -227,7 +231,7 @@ def category_create(request: Request, current_user=Depends(get_current_user),
                     ):
     """Рендеринг формы для добавления категории"""
     return templates.TemplateResponse("create_category.html", {
-        "request": request, "categories": all_categories, "current_user": current_user
+        "request": request, "categories": all_categories, "current_user": current_user, "category_update": False
     })
 
 
@@ -244,3 +248,70 @@ def category_create(request: Request, current_user=Depends(get_current_user),
         })
     return responses.RedirectResponse(f'/?messages=Category {category["data"]["title"]} create:)',
                                       status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/category-update-delete")
+def category_update_delete(
+        request: Request, all_category=Depends(get_all_categories), current_user=Depends(get_current_user)
+):
+    """Рендеринг страницы с категориями"""
+    category = "Category update/delete"
+    messages = request.session.pop("messages", "")
+    return templates.TemplateResponse("table_category.html", {
+        "request": request, "categories_edit": all_category, "current_user": current_user, "msg": category,
+        "messages": messages  # Сообщение, которое будет показано после перенаправления
+    })
+
+
+@router.get("/update_category/{category_id}")
+def category_update(
+        request: Request, current_user=Depends(get_current_user), all_categories=Depends(get_all_categories),
+        category=Depends(get_category)
+):
+    """Получения категории которую необходимо обновить"""
+    update = "Update Category"
+    return templates.TemplateResponse("update_category.html", {
+        "request": request, "categories": all_categories, "current_user": current_user, "category_update": True,
+        "msg": update, "category": category
+    })
+
+
+@router.post("/update_category/{category_id}")
+def category_update(request: Request, get_update=Depends(update_one_category),
+                    all_categories=Depends(get_all_categories), current_user=Depends(get_current_user),
+                    category=Depends(get_category)
+                    ):
+    """Обновление категории"""
+    update = "Update Category"
+    if "errors_title" in get_update:
+        request.session["messages"] = f'The category with the name: {get_update["title"]} already exists'
+        redirect_url = "/category-update-delete"
+        return responses.RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+    if "errors" in get_update:
+        return templates.TemplateResponse("update_category.html", {
+            "request": request, "err": True, "errors": get_update["errors"], "not_correct": get_update["not_correct"],
+            "msg": update, "categories": all_categories, "current_user": current_user, "category": category
+        })
+    # Сообщение, которое будет показано после перенаправления
+    request.session["messages"] = f"Update Category: {get_update['data']['title']}"
+    redirect_url = "/category-update-delete"
+    return responses.RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+
+@router.get("/delete_category/{category_id}")
+def delete_category(request: Request, category=Depends(delete_category)):
+    """Удаление категории"""
+    request.session["messages"] = f"Category {category['title']} Delete!"
+    redirect_url = "/category-update-delete"
+    return responses.RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+
+@router.post("/search/")
+def post_search(request: Request, posts=Depends(search_post), all_categories=Depends(get_all_categories),
+                page: int = PAGE, current_user=Depends(get_current_user)):
+    """Регистронезависимый поиск + пагинация результатов"""
+
+    return templates.TemplateResponse("index.html", {
+        "request": request, "posts": posts, "categories": all_categories, "page": page,
+        "current_user": current_user
+    })
