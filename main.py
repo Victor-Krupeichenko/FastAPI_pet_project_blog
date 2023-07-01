@@ -8,7 +8,6 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from src.settings_env import SECRET_KEY_SESSION
 
-
 app = FastAPI(
     title="My_app_project"
 )
