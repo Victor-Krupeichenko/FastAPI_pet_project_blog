@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from src.api_models import Post
 from sqlalchemy.ext.asyncio import AsyncSession
 from api_databases.connect_db import get_async_session, data_is_not_valid, PAGE, LIMIT
-from post.schemes import PostScheme, AdminPostScheme
+from post.schemes import PostScheme, AdminPostScheme, SearchPostScheme
 from sqlalchemy import insert, select, update, and_, func
 from user.my_token import get_current_user
 from user.routers import field_validation
@@ -61,7 +61,7 @@ async def content_error(row_dict: dict, key: str):
 
 @router.post("/create_post")
 async def create_post(
-        post: PostScheme = Depends(PostScheme.is_form),
+        post: PostScheme = Depends(PostScheme.as_form),
         session: AsyncSession = Depends(get_async_session),
         current_user: dict = Depends(get_current_user)
 ):
@@ -125,7 +125,7 @@ async def get_one_post(post_id: int, session: AsyncSession = Depends(get_async_s
 
 
 @router.put("/update_post/{post_id}", status_code=status.HTTP_202_ACCEPTED)
-async def update_post(post_id: int, post: PostScheme = Depends(PostScheme.is_form),
+async def update_post(post_id: int, post: PostScheme = Depends(PostScheme.as_form),
                       current_user: dict = Depends(get_current_user),
                       session: AsyncSession = Depends(get_async_session)
                       ):
@@ -171,7 +171,7 @@ async def update_post_published(post_id: int, post: AdminPostScheme, current_use
             print(query)
             await session.execute(query)
             await session.commit()
-            return {"message": f"Post ID: {post_id} published"}
+            return {"messages": f"Post ID: {post_id} published"}
         except Exception:
             raise data_is_not_valid
     raise HTTPException(
@@ -209,11 +209,37 @@ async def delete_post(post_id: int, session: AsyncSession = Depends(get_async_se
     post = await session.execute(query)
     post_delete = post.scalar()
     if not current_user:
-        return {"message": "No authorization"}
+        return {"messages": "No authorization"}
     if not post:
-        return {"message": f"Post ID: {post_id} not found"}
+        return {"messages": f"Post ID: {post_id} not found"}
     if current_user["group"] != "ADMIN" and post_delete.user_id != current_user["user_id"]:
-        return {"message": "You are not the post author or administrator"}
+        return {"messages": "You are not the post author or administrator"}
     await session.delete(post_delete)
     await session.commit()
-    return {"message": f"Post ID: {post_id} Delete"}
+    return {"messages": f"Post ID: {post_id} Delete"}
+
+
+@router.post("/search/")
+async def search_post(
+        post_title: SearchPostScheme = Depends(SearchPostScheme.as_form),
+        session: AsyncSession = Depends(get_async_session),
+        page: int = PAGE, limit: int = LIMIT
+):
+    """Поиск"""
+    post_search = post_title.search.lower()
+    post_count = select(func.count(Post.id)).select_from(Post).filter(
+        and_(func.lower(Post.title).like(f"%{post_search}%"), Post.published))
+    exists = await session.scalar(post_count)
+    if exists == 0:
+        response = {
+            "not_found": f"Post {post_title.search} not found"
+        }
+        return response
+    # Получение записей в диапазоне
+    start, end = await my_range(page, limit)
+    post_search = select(Post).options(selectinload(Post.category)).filter(
+        and_(Post.published, func.lower(Post.title).like(f"%{post_search}%"))).order_by(Post.id.desc()).slice(start,
+                                                                                                              end)
+    # Пагинация
+    result = await pagination(query=post_search, count_data=exists, limit=limit, session=session)
+    return result
