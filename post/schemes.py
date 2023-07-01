@@ -36,7 +36,7 @@ class PostScheme(BaseModel):
         return value
 
     @classmethod
-    def is_form(cls, title: str = Form(...), content: Text = Form(...), category_id: int = Form(...)):
+    def as_form(cls, title: str = Form(...), content: Text = Form(...), category_id: int = Form(...)):
         return cls(title=title, content=content, category_id=category_id)
 
     class Config:
@@ -45,3 +45,12 @@ class PostScheme(BaseModel):
 
 class AdminPostScheme(BaseModel):
     published: bool = True
+
+
+class SearchPostScheme(BaseModel):
+    """Схема для поиска"""
+    search: str
+
+    @classmethod
+    def as_form(cls, search: str = Form(...)):
+        return cls(search=search)
