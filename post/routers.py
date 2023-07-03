@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi_cache.decorator import cache
 from math import ceil
 from sqlalchemy.orm import joinedload, selectinload
 from src.api_models import Post
@@ -13,15 +14,15 @@ router = APIRouter(
     prefix="/post", tags=["Post"]
 )
 
-count_date = None
+
+# count_date = None
 
 
 async def get_count_date_all(session: AsyncSession = Depends(get_async_session)):
     """Получает общее количество опубликованных данных"""
     query = select(func.count()).select_from(Post).filter(Post.published)
     exists = await session.scalar(query)
-    global count_date
-    count_date = exists
+    return exists
 
 
 async def pagination(
@@ -93,14 +94,14 @@ async def create_post(
     return response
 
 
-@router.get("/all_posts", status_code=status.HTTP_200_OK)
+# @router.get("/all_posts", status_code=status.HTTP_200_OK)
+@cache(expire=600)
 async def get_all_posts(page: int = PAGE, limit: int = LIMIT,
                         session: AsyncSession = Depends(get_async_session)):
-    """Получение всех опубликованных записей"""
+    """Получение всех опубликованных записей + кэширование записей"""
     try:
         # Получаем общее количество данных
-        if count_date is None:
-            await get_count_date_all(session)
+        count_date = await get_count_date_all(session)
         # Получение записей в диапазоне
         start, end = await my_range(page, limit)
         qu = select(Post).options(selectinload(Post.category)).filter(
@@ -108,9 +109,16 @@ async def get_all_posts(page: int = PAGE, limit: int = LIMIT,
         ).order_by(Post.id.desc()).slice(start, end)
         # Пагинация
         result = await pagination(query=qu, count_data=count_date, limit=limit, session=session)
+        # print(result)
         return result
     except Exception:
         raise data_is_not_valid
+
+
+@router.get("/all_posts", status_code=status.HTTP_200_OK)
+async def get_all_posts_handler(posts=Depends(get_all_posts)):
+    """Обработчик для получения всех опубликованных записей"""
+    return posts
 
 
 @router.get("/one_post/{post_id}", status_code=status.HTTP_200_OK)
