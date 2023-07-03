@@ -1,0 +1,10 @@
+{% for category in categories %}
+    <ol class="list-group">
+        <li class="list-group-item d-flex justify-content-between align-items-start">
+            <div class="md-2 me-auto">
+                <div><a href="/category_post_all/{{ category["category_id"] }}">{{ category["category"] }}</a></div>
+            </div>
+            <span class="badge bg-primary rounded-pill">{{ category["post_count"] }}</span>
+        </li>
+    </ol>
+{% endfor %}

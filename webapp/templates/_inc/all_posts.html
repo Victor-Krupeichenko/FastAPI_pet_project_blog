@@ -1,0 +1,13 @@
+<div class="col">
+    <div class="card h-100">
+        <div class="card-body">
+            <h5 class="card-title">{{ post.title }}</h5>
+            <p class="card-text">{{ post.content|word_count(5) }}</p>
+            <p class="card-text">{{ post.category.title }}</p>
+            <a href="/one_post/{{ post.id }}" class="btn btn-primary stretched-link">Read</a>
+        </div>
+        <div class="card-footer">
+            <small class="text-body-secondary">{{ post.created|format_time }}</small>
+        </div>
+    </div>
+</div>

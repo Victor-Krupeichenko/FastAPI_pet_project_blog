@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if category_title %}
+        {{ category_title.title }}
+    {% else %}
+        My App
+    {% endif %}
+{% endblock %}
+{% block content %}
+    {% if posts["not_found"] %}
+        <h4>
+        <div class="alert alert-primary" role="alert">
+            {{ posts["not_found"] }}
+        </div>
+        </h4>
+    {% endif %}
+    <div class="row row-cols-1 row-cols-md-3 g-3">
+        {% for post in posts["data"] %}
+            {% include "_inc/all_posts.html" %}
+        {% endfor %}
+        {% if posts["show_pagination"] %}
+            {% include '_inc/pagination.html' %}
+        {% endif %}
+    </div>
+{% endblock %}
+

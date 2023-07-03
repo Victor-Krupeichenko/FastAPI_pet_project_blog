@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+
+{% block title %}
+    Update Category
+{% endblock %}
+
+
+
+{% block content %}
+    {{ messages }}
+    {% include '_inc/errors.html' %}
+    <form action="/update_category/{{ category.id }}" method="post">
+        <label class="form-label">Category Title:</label>
+        {% if err %}
+            <div class="mb-3">
+                <input type="text" value="{% if not_correct['title'] %}{{ not_correct['title'] }}{% endif %}"
+                       class="form-control" name="title" placeholder="Enter category title" required>
+            </div>
+        {% else %}
+            <div class="mb-3">
+                <input type="text"
+                       class="form-control" name="title" placeholder="Enter category title"
+                       value="{{ category.title }}"
+                       required>
+            </div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary">Update Category</button>
+    </form>
+{% endblock %}

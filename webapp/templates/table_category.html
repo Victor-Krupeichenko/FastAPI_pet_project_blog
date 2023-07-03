@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    Categories
+{% endblock %}
+<div class="col-md-9">
+    {% block content %}
+        <table class="table table-bordered">
+            <thead>
+            <tr>
+                <th scope="col">№</th>
+                <th scope="col">Title</th>
+                <th scope="col">Post Count</th>
+                {% if current_user['group'] == 'ADMIN' %}
+                    <th scope="col"></th>
+                    <th scope="col"></th>
+                {% endif %}
+
+            </thead>
+            <tbody>
+
+            {% for category in categories_edit %}
+                <tr>
+                    <th scope="row">{{ loop.index }}</th>
+                    <td><a href="/category_post_all/{{ category["category_id"] }}">{{ category["category"] }}</a></td>
+                    <td>{{ category['post_count'] }}</td>
+                    {% if current_user['group'] == 'ADMIN' %}
+                        <td>
+                            <button type="submit" class="btn btn-danger"><a
+                                    href="/delete_category/{{ category['category_id'] }}">Delete</a></button>
+                        </td>
+                        <td>
+                            <button type="submit" class="btn btn-info"><a
+                                    href="/update_category/{{ category["category_id"] }}">Update</a></button>
+                        </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endblock %}

@@ -1,0 +1,26 @@
+<nav aria-label="...">
+    <ul class="pagination pagination-md">
+        {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="/?page={{ page - 1 }}">Previous</a>
+            </li>
+        {% endif %}
+        {% for item in range(1, posts["total_pages"] + 1) %}
+            {% if page == item %}
+                <li class="page-item active" aria-current="page">
+                    <a class="page-link" href="?page={{ item }}">{{ item }}</a>
+                </li>
+            {% elif item > (page - 3) and item < (page + 3) %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ item }}">{{ item }}</a>
+                </li>
+            {% endif %}
+        {% endfor %}
+        {% set end = ((page + 1) if (page + 1) <= posts["total_pages"] else posts["total_pages"]) %}
+        {% if end < posts["total_pages"] %}
+            <li class="page-item">
+                <a class="page-link" href="/?page={{ page + 1 }}">Next</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+
+{% block title %}
+    Update Post
+{% endblock %}
+
+
+{% block content %}
+    {% include '_inc/errors.html' %}
+    <div class="container">
+        <form method="POST" action="/update_post/{{ post.id }}">
+            <div class="mb-3">
+                {% if err %}
+                    <input type="text" class="form-control" name="title" placeholder="Title:" required
+                           value="{% if not_correct['title'] %}{{ not_correct['title'] }}{% else %}{{ post.title }}{% endif %}">
+                    </div>
+                    <div class="mb-3">
+                <textarea class="form-control" name="content" placeholder="Content:" required rows="15"
+                          cols="50">{% if not_correct['content'] %}{{ not_correct['content'] }}{% else %}{{ post.content }}{% endif %}</textarea>
+                    </div>
+                {% else %}
+                    <div class="mb-3">
+                        <input type="text" class="form-control" name="title" placeholder="Title:" required
+                               value="{{ post.title }}">
+                    </div>
+                    <div class="mb-3">
+                <textarea class="form-control" name="content" placeholder="Content:" required rows="15"
+                          cols="50">{{ post.content }}</textarea>
+                    </div>
+                {% endif %}
+            <div class="mb-3">
+                <label for="" class="form-label">
+                    <select class="form-select" required name="category_id">
+                        <option selected value="0">Category:</option>
+                        {% for item in category %}
+                            <option value="{{ item.id }}">{{ item.title }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Post</button>
+        </form>
+    </div>
+{% endblock %}

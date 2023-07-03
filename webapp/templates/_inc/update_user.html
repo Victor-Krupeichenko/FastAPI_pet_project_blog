@@ -1,0 +1,12 @@
+<form action="/update_user/{{ current_user["user_id"] }}" method="post">
+    <div class="mb-3">
+        <input type="text" class="form-control" name="username" value="{{ current_user["username"] }}" placeholder="Enter username" required>
+    </div>
+    <div class="mb-3">
+        <input type="password" class="form-control" name="password" placeholder="Enter password" required>
+    </div>
+    <div class="mb-3">
+        <input type="email" class="form-control" name="email" value="{{ current_user["email"] }}" placeholder="Enter email" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Update User</button>
+</form>

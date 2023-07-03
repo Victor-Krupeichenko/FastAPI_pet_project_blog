@@ -1,0 +1,60 @@
+<nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+            <img src="{{ url_for('static', path='images/my_app.png') }}" alt="My App" width="150" height="100">
+        </a>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link" aria-current="page" href="/docs">Docs</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" aria-current="page" href="/redoc">ReDocs</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" aria-current="page"
+                       href="/category-update-delete">Category</a>
+                </li>
+                {% if current_user %}
+                    <li class="nav-item">
+                        <span class="nav-link" aria-current="page">Logged in as: {{ current_user["username"] }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/update_user">Update user</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/logout">logout</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" aria-current="page" href="/create_post">Create Post</a>
+                    </li>
+                    {% if not current_user["group"] == "ADMIN" %}
+                        <li class="nav-item">
+                            <a class="nav-link" aria-current="page"
+                               href="/delete/{{ current_user["user_id"] }}">Delete user</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" aria-current="page"
+                               href="/category_create">Create Category</a>
+                        </li>
+                    {% endif %}
+                {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if log_in %} active {% endif %}" aria-current="page"
+                           href="/login">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if logup %} active {% endif %}" aria-current="page" href="/registration">Register</a>
+                    </li>
+                {% endif %}
+            </ul>
+            <form action="/search/" class="d-flex" method="post">
+                <div class="mb-3">
+                    <input type="text" class="form-control" name="search" placeholder="search" required>
+                </div>
+                <button class="btn btn-outline-success" type="submit">Поиск</button>
+            </form>
+        </div>
+    </div>
+</nav>

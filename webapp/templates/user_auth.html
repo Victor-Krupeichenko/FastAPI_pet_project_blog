@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {{ msg }}
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        {% include '_inc/errors.html' %}
+        {% if logup %}
+            {% include '_inc/register.html' %}
+        {% elif log_in %}
+            {% include '_inc/login.html' %}
+        {% elif update_user %}
+            {% include '_inc/update_user.html' %}
+        {% endif %}
+    </div>
+{% endblock %}
