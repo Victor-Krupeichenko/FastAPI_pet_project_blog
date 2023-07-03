@@ -1,16 +1,15 @@
 from fastapi import APIRouter, Request, Depends, status, responses
 from fastapi.templating import Jinja2Templates
-
 from api_databases.connect_db import PAGE
 from user.my_token import get_current_user
 from post.routers import (
-    get_all_posts,
     get_one_post,
     category_post_all,
     create_post,
     update_post,
     delete_post,
-    search_post
+    search_post,
+    get_all_posts_handler
 )
 from category.routers import (
     get_all_categories,
@@ -18,7 +17,7 @@ from category.routers import (
     categories,
     create_category,
     update_one_category,
-    delete_category
+    delete_category,
 )
 from user.routers import (
     user_create,
@@ -51,7 +50,8 @@ env.filters["word_count"] = word_count
 
 
 @router.get("/")
-async def post_all(request: Request, posts=Depends(get_all_posts), all_categories=Depends(get_all_categories),
+async def post_all(request: Request, all_categories=Depends(get_all_categories),
+                   posts=Depends(get_all_posts_handler),
                    page: int = PAGE, messages: str = None, current_user=Depends(get_current_user)):
     """Главная страница (вывод всех постов) + пагинация """
     return templates.TemplateResponse("index.html", {
