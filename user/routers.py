@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.hash import pbkdf2_sha256
 from sqlalchemy import insert, select, update
 from user.my_token import get_current_user
+from tasks.tasks import send_email_login
 
 router = APIRouter(
     prefix="/user", tags=["User"]
@@ -61,6 +62,9 @@ async def user_create(user: UserSchema = Depends(UserSchema.as_form),
     # Перехватываем все непредвиденные исключения
     except Exception:
         raise data_is_not_valid
+
+    # Отправка письма при успешной регистрации
+    send_email_login.delay(user_data["username"], user_data["email"])
 
     # При успешной регистрации возвращаем словарь
     response = {
